@@ -1,6 +1,10 @@
 .venv/
 venv/
 
+# Python cache
+__pycache__/
+*.pyc
+
 # DVC-generated / large artifacts (tracked by DVC, not Git)
 data/processed/*.csv
 data/processed/train_metrics*.json

@@ -79,9 +79,11 @@ jobs:
 
       - name: Promote best candidate to champion registry
         env:
-          EXPERIMENT_NAME: ${{ inputs.experiment_name }}
-          METRIC: ${{ inputs.metric }}
-          FORCE: ${{ inputs.force }}
+          # `inputs.*` is only populated for workflow_dispatch.
+          # On push runs, these default so we don't pass empty strings.
+          EXPERIMENT_NAME: ${{ github.event.inputs.experiment_name || 'push' }}
+          METRIC: ${{ github.event.inputs.metric || 'pr_auc' }}
+          FORCE: ${{ github.event.inputs.force || 'false' }}
         run: |
           if [ "$FORCE" = "true" ]; then
             python modelinfo/registryhelpers/promote_to_registry.py --params params.yaml --experiment-name "$EXPERIMENT_NAME" --metric "$METRIC" --promote --force

@@ -147,6 +147,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    metric_name = (args.metric or "").strip()
+    if not metric_name:
+        metric_name = "pr_auc"
+
     experiment_name = args.experiment_name
     if not experiment_name:
         # Default experiment name in CI if user didn't choose one.
@@ -155,7 +159,7 @@ def main() -> None:
     CANDIDATES_DIR.mkdir(parents=True, exist_ok=True)
     CHAMPION_DIR.mkdir(parents=True, exist_ok=True)
 
-    candidates = _build_candidates(args.params, metric_name=args.metric)
+    candidates = _build_candidates(args.params, metric_name=metric_name)
     # Pick best by metric (higher is better)
     best = max(candidates, key=lambda c: c.metric_value)
 
@@ -174,7 +178,7 @@ def main() -> None:
     meta = {
         "created_at": _utc_now_iso(),
         "experiment_name": experiment_name,
-        "metric_for_promotion": args.metric,
+        "metric_for_promotion": metric_name,
         "metric_value": best.metric_value,
         "model_name": best.name,
         "git_sha": os.getenv("GITHUB_SHA"),
@@ -183,7 +187,7 @@ def main() -> None:
 
     print("Candidate prepared")
     print(f"- candidate_dir: {out_dir}")
-    print(f"- best {args.metric}: {best.metric_value:.6f} ({best.name})")
+    print(f"- best {metric_name}: {best.metric_value:.6f} ({best.name})")
 
     if not args.promote:
         print("Promotion skipped (use --promote to enable).")
@@ -197,7 +201,7 @@ def main() -> None:
     champion_metric: Optional[float] = None
     if champion_metrics:
         try:
-            champion_metric = _get_metric(champion_metrics, args.metric)
+            champion_metric = _get_metric(champion_metrics, metric_name)
         except Exception:
             champion_metric = None
 
@@ -205,7 +209,7 @@ def main() -> None:
 
     if not should_promote:
         print("Not promoting: candidate did not beat current champion.")
-        print(f"- champion {args.metric}: {champion_metric}")
+        print(f"- champion {metric_name}: {champion_metric}")
         return
 
     _copy_file(cand_model_path, champion_model_path)
@@ -215,7 +219,7 @@ def main() -> None:
         "promoted_at": _utc_now_iso(),
         "source_candidate_dir": str(out_dir),
         "experiment_name": experiment_name,
-        "metric_for_promotion": args.metric,
+        "metric_for_promotion": metric_name,
         "candidate_metric": best.metric_value,
         "previous_champion_metric": champion_metric,
         "model_name": best.name,
