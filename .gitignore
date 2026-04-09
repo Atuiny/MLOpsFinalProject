@@ -3,6 +3,13 @@ venv/
 
 # DVC-generated / large artifacts (tracked by DVC, not Git)
 data/processed/*.csv
+data/processed/train_metrics*.json
 model.joblib
 modelinfo/modelpkl/*.joblib
 modelinfo/modelregistry/**/model.joblib
+
+# Generated registry outputs (DVC stage outs)
+modelinfo/modelregistry/champion/*.json
+
+# Generated experiment artifacts (created by promote script)
+modelinfo/modelregistry/candidates/**

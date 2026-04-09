@@ -1,2 +1,6 @@
 /credit_card_clean.csv
 /cleaning_report.json
+/train_metrics.json
+/train_metrics_lr.json
+/train_metrics_rf.json
+/train_metrics_dt.json
