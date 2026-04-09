@@ -53,3 +53,159 @@ stages:
       hash: md5
       md5: 18dd95eba2c3b5720105518a22c6093b
       size: 67277978
+  train:
+    cmd: python src/Train.py --params params.yaml
+    deps:
+    - path: data/processed/credit_card_clean.csv
+      hash: md5
+      md5: 18dd95eba2c3b5720105518a22c6093b
+      size: 67277978
+    - path: src/Train.py
+      hash: md5
+      md5: a7f5398fde18d9fb29c7e90f6e0d506a
+      size: 11203
+    params:
+      params.yaml:
+        train:
+          input_csv: data/processed/credit_card_clean.csv
+          expected_columns:
+          - distance_from_home
+          - distance_from_last_transaction
+          - ratio_to_median_purchase_price
+          - repeat_retailer
+          - used_chip
+          - used_pin_number
+          - online_order
+          - fraud
+          feature_columns:
+          - distance_from_home
+          - distance_from_last_transaction
+          - ratio_to_median_purchase_price
+          - repeat_retailer
+          - used_chip
+          - used_pin_number
+          - online_order
+          target_column: fraud
+          test_size: 0.2
+          random_state: 42
+          decision_threshold: 0.5
+          max_rows:
+          models:
+            lr:
+              enabled: true
+              type: logistic_regression
+              model_out: modelinfo/modelpkl/fraud_model_lr.joblib
+              metrics_out: data/processed/train_metrics_lr.json
+              use_standard_scaler: true
+              params:
+                penalty:
+                C: 1.0
+                solver: lbfgs
+                max_iter: 200
+                class_weight: balanced
+                random_state: 42
+            rf:
+              enabled: true
+              type: random_forest
+              model_out: modelinfo/modelpkl/fraud_model_rf.joblib
+              metrics_out: data/processed/train_metrics_rf.json
+              use_standard_scaler: false
+              params:
+                n_estimators: 300
+                max_depth:
+                min_samples_split: 2
+                min_samples_leaf: 1
+                max_features: sqrt
+                class_weight: balanced
+                n_jobs: -1
+                random_state: 42
+            dt:
+              enabled: true
+              type: decision_tree
+              model_out: modelinfo/modelpkl/fraud_model_dt.joblib
+              metrics_out: data/processed/train_metrics_dt.json
+              use_standard_scaler: false
+              params:
+                max_depth:
+                min_samples_split: 2
+                min_samples_leaf: 1
+                class_weight: balanced
+                random_state: 42
+    outs:
+    - path: data/processed/train_metrics_dt.json
+      hash: md5
+      md5: 12fa667471f17eb25203633468599961
+      size: 545
+    - path: data/processed/train_metrics_lr.json
+      hash: md5
+      md5: be4a5f06a44bc63342a75714d3d7336a
+      size: 567
+    - path: data/processed/train_metrics_rf.json
+      hash: md5
+      md5: 01733622b2af3c77217009f16e67942c
+      size: 545
+    - path: modelinfo/modelpkl/fraud_model_dt.joblib
+      hash: md5
+      md5: f03cb0d8db42aa387b757a3eb2576608
+      size: 9149
+    - path: modelinfo/modelpkl/fraud_model_lr.joblib
+      hash: md5
+      md5: 2dfb6c5a09c0eda3b772d1b14bb7d071
+      size: 2260
+    - path: modelinfo/modelpkl/fraud_model_rf.joblib
+      hash: md5
+      md5: b946961ea3df87f67cad290a4ffa684e
+      size: 10572482
+  promote:
+    cmd: python modelinfo/registryhelpers/promote_to_registry.py --params 
+      params.yaml --experiment-name dvc --metric pr_auc --promote
+    deps:
+    - path: data/processed/train_metrics_dt.json
+      hash: md5
+      md5: 12fa667471f17eb25203633468599961
+      size: 545
+    - path: data/processed/train_metrics_lr.json
+      hash: md5
+      md5: be4a5f06a44bc63342a75714d3d7336a
+      size: 567
+    - path: data/processed/train_metrics_rf.json
+      hash: md5
+      md5: 01733622b2af3c77217009f16e67942c
+      size: 545
+    - path: modelinfo/modelpkl/fraud_model_dt.joblib
+      hash: md5
+      md5: f03cb0d8db42aa387b757a3eb2576608
+      size: 9149
+    - path: modelinfo/modelpkl/fraud_model_lr.joblib
+      hash: md5
+      md5: 2dfb6c5a09c0eda3b772d1b14bb7d071
+      size: 2260
+    - path: modelinfo/modelpkl/fraud_model_rf.joblib
+      hash: md5
+      md5: b946961ea3df87f67cad290a4ffa684e
+      size: 10572482
+    - path: modelinfo/registryhelpers/promote_to_registry.py
+      hash: md5
+      md5: 8a7743424277adab04d5a49a61541f02
+      size: 8427
+    - path: params.yaml
+      hash: md5
+      md5: 8ca7abc47c83393b574e2336fc765225
+      size: 3517
+    outs:
+    - path: model.joblib
+      hash: md5
+      md5: b946961ea3df87f67cad290a4ffa684e
+      size: 10572482
+    - path: modelinfo/modelregistry/champion/metadata.json
+      hash: md5
+      md5: 0575e0500b9722a2508005efe83f0500
+      size: 368
+    - path: modelinfo/modelregistry/champion/metrics.json
+      hash: md5
+      md5: 01733622b2af3c77217009f16e67942c
+      size: 545
+    - path: modelinfo/modelregistry/champion/model.joblib
+      hash: md5
+      md5: b946961ea3df87f67cad290a4ffa684e
+      size: 10572482
