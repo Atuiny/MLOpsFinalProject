@@ -1,0 +1,27 @@
+{
+  "model_name": "rf",
+  "model_type": "random_forest",
+  "n_train": 40000,
+  "n_test": 10000,
+  "fraud_rate_train": 0.08635,
+  "fraud_rate_test": 0.0863,
+  "roc_auc": 0.9999996829515838,
+  "pr_auc": 0.9999959781143917,
+  "log_loss": 0.003364521406559368,
+  "brier": 0.0005641011111111111,
+  "threshold": 0.5,
+  "accuracy": 0.9995,
+  "precision": 1.0,
+  "recall": 0.9942062572421785,
+  "f1": 0.9970947123765252,
+  "confusion_matrix": [
+    [
+      9137,
+      0
+    ],
+    [
+      5,
+      858
+    ]
+  ]
+}

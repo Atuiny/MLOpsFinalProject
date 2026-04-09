@@ -1,0 +1,11 @@
+{
+  "features": {
+    "distance_from_home": 5.0,
+    "distance_from_last_transaction": 2.0,
+    "ratio_to_median_purchase_price": 1.1,
+    "repeat_retailer": 1,
+    "used_chip": 1,
+    "used_pin_number": 0,
+    "online_order": 0
+  }
+}

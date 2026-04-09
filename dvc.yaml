@@ -1,0 +1,44 @@
+stages:
+  clean:
+    cmd: python src/CleanData.py --params params.yaml
+    deps:
+      - src/CleanData.py
+      - data/raw/credit_card_data.csv
+    params:
+      - clean_data
+    outs:
+      - data/processed/credit_card_clean.csv
+      - data/processed/cleaning_report.json
+
+  train:
+    cmd: python src/Train.py --params params.yaml
+    deps:
+      - src/Train.py
+      - data/processed/credit_card_clean.csv
+    params:
+      - train
+    outs:
+      - modelinfo/modelpkl/fraud_model_lr.joblib
+      - modelinfo/modelpkl/fraud_model_rf.joblib
+      - modelinfo/modelpkl/fraud_model_dt.joblib
+    metrics:
+      - data/processed/train_metrics_lr.json
+      - data/processed/train_metrics_rf.json
+      - data/processed/train_metrics_dt.json
+
+  promote:
+    cmd: python modelinfo/registryhelpers/promote_to_registry.py --params params.yaml --experiment-name dvc --metric pr_auc --promote
+    deps:
+      - modelinfo/registryhelpers/promote_to_registry.py
+      - params.yaml
+      - modelinfo/modelpkl/fraud_model_lr.joblib
+      - modelinfo/modelpkl/fraud_model_rf.joblib
+      - modelinfo/modelpkl/fraud_model_dt.joblib
+      - data/processed/train_metrics_lr.json
+      - data/processed/train_metrics_rf.json
+      - data/processed/train_metrics_dt.json
+    outs:
+      - modelinfo/modelregistry/champion/model.joblib
+      - modelinfo/modelregistry/champion/metrics.json
+      - modelinfo/modelregistry/champion/metadata.json
+      - model.joblib

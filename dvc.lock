@@ -1,0 +1,55 @@
+schema: '2.0'
+stages:
+  clean:
+    cmd: python src/CleanData.py --params params.yaml
+    deps:
+    - path: data/raw/credit_card_data.csv
+      hash: md5
+      md5: e3e6816e421b06706ddd35897e2f1b89
+      size: 76277977
+    - path: src/CleanData.py
+      hash: md5
+      md5: 43ca2bea4c6facb9e123445509470b05
+      size: 8724
+    params:
+      params.yaml:
+        clean_data:
+          input_csv: data/raw/credit_card_data.csv
+          output_csv: data/processed/credit_card_clean.csv
+          report_json: data/processed/cleaning_report.json
+          expected_columns:
+          - distance_from_home
+          - distance_from_last_transaction
+          - ratio_to_median_purchase_price
+          - repeat_retailer
+          - used_chip
+          - used_pin_number
+          - online_order
+          - fraud
+          float_columns:
+          - distance_from_home
+          - distance_from_last_transaction
+          - ratio_to_median_purchase_price
+          binary_columns:
+          - repeat_retailer
+          - used_chip
+          - used_pin_number
+          - online_order
+          - fraud
+          target_column: fraud
+          enforce_non_negative: true
+          max_float_values:
+            distance_from_home:
+            distance_from_last_transaction:
+            ratio_to_median_purchase_price:
+          strict: true
+          drop_duplicates: false
+    outs:
+    - path: data/processed/cleaning_report.json
+      hash: md5
+      md5: 0c0abb4ff4f9e84bf0b5e3212b11f548
+      size: 1508
+    - path: data/processed/credit_card_clean.csv
+      hash: md5
+      md5: 18dd95eba2c3b5720105518a22c6093b
+      size: 67277978

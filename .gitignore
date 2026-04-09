@@ -1,2 +1,8 @@
 .venv/
 venv/
+
+# DVC-generated / large artifacts (tracked by DVC, not Git)
+data/processed/*.csv
+model.joblib
+modelinfo/modelpkl/*.joblib
+modelinfo/modelregistry/**/model.joblib

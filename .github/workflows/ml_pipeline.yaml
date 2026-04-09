@@ -1,0 +1,154 @@
+name: ML Pipeline with GitHub Actions
+
+# This workflow mimics an MLflow-style process using GitHub Actions + a file-based registry:
+# - Clean data
+# - Train 3 candidate models (LR, RF, DT)
+# - Promote the best candidate to "champion" in modelinfo/modelregistry/
+# - Build a Docker image that serves the champion via FastAPI
+# - Smoke test /health and /predict
+# - Upload artifacts (champion model, metrics, and Docker image tar)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+  workflow_dispatch:
+    inputs:
+      experiment_name:
+        description: "Experiment name (stored in registry metadata)"
+        required: false
+        default: "manual"
+      metric:
+        description: "Metric used to pick/promote champion (e.g., pr_auc, roc_auc, recall)"
+        required: false
+        default: "pr_auc"
+      force:
+        description: "Force promotion even if not improved"
+        required: false
+        default: "false"
+      max_rows:
+        description: "Optional: train on only first N rows (leave empty for full dataset)"
+        required: false
+        default: ""
+
+jobs:
+  train-evaluate-register:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: (Optional) DVC pull data
+        # If the raw CSV is tracked by DVC and not checked into git, this step will fetch it.
+        # If you haven't configured a DVC remote yet, this step may fail; you can remove it
+        # or set up a remote and run `dvc push` locally.
+        run: |
+          if [ ! -f data/raw/credit_card_data.csv ]; then
+            echo "Raw data missing; attempting dvc pull..."
+            dvc pull || (echo "dvc pull failed - ensure DVC remote is configured" && exit 1)
+          else
+            echo "Raw data already present."
+          fi
+
+      - name: Run cleaning stage
+        run: |
+          python src/CleanData.py --params params.yaml
+
+      - name: Run training stage (3 models)
+        env:
+          MAX_ROWS: ${{ inputs.max_rows }}
+        run: |
+          if [ -n "$MAX_ROWS" ]; then
+            python src/Train.py --params params.yaml --max-rows "$MAX_ROWS"
+          else
+            python src/Train.py --params params.yaml
+          fi
+
+      - name: Promote best candidate to champion registry
+        env:
+          EXPERIMENT_NAME: ${{ inputs.experiment_name }}
+          METRIC: ${{ inputs.metric }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "$FORCE" = "true" ]; then
+            python modelinfo/registryhelpers/promote_to_registry.py --params params.yaml --experiment-name "$EXPERIMENT_NAME" --metric "$METRIC" --promote --force
+          else
+            python modelinfo/registryhelpers/promote_to_registry.py --params params.yaml --experiment-name "$EXPERIMENT_NAME" --metric "$METRIC" --promote
+          fi
+
+      - name: Build Docker image
+        run: |
+          docker build -t fraud-inference-api:latest .
+
+      - name: Run Docker container
+        run: |
+          docker run -d --name fraud-inference-api -p 8000:8000 fraud-inference-api:latest
+
+      - name: Smoke test /health
+        run: |
+          for i in {1..15}; do
+            if curl -fsS http://localhost:8000/health > /dev/null; then
+              echo "health ok"
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8000/health
+
+      - name: Smoke test /predict
+        run: |
+          curl -fsS -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d @sample_request.json
+
+      - name: Stop Docker container
+        if: always()
+        run: |
+          docker rm -f fraud-inference-api || true
+
+      - name: Export Docker image tar
+        run: |
+          docker save fraud-inference-api:latest -o fraud-inference-api.tar
+
+      - name: Show generated registry files
+        run: |
+          ls -R modelinfo/modelregistry || true
+          echo "----- champion metrics -----"
+          cat modelinfo/modelregistry/champion/metrics.json || true
+          echo "----- champion metadata -----"
+          cat modelinfo/modelregistry/champion/metadata.json || true
+
+      - name: Upload champion model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: champion-model
+          path: modelinfo/modelregistry/champion/model.joblib
+
+      - name: Upload champion registry artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: champion-registry
+          path: modelinfo/modelregistry/champion/
+
+      - name: Upload metrics artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: train-metrics
+          path: data/processed/train_metrics_*.json
+
+      - name: Upload Docker image tar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fraud-inference-api-tar
+          path: fraud-inference-api.tar

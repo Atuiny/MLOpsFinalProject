@@ -1,0 +1,127 @@
+clean_data:
+  input_csv: data/raw/credit_card_data.csv
+  output_csv: data/processed/credit_card_clean.csv
+  report_json: data/processed/cleaning_report.json
+
+  expected_columns:
+    - distance_from_home
+    - distance_from_last_transaction
+    - ratio_to_median_purchase_price
+    - repeat_retailer
+    - used_chip
+    - used_pin_number
+    - online_order
+    - fraud
+
+  float_columns:
+    - distance_from_home
+    - distance_from_last_transaction
+    - ratio_to_median_purchase_price
+
+  binary_columns:
+    - repeat_retailer
+    - used_chip
+    - used_pin_number
+    - online_order
+    - fraud
+
+  target_column: fraud
+  enforce_non_negative: true
+
+  # Optional "magic-number" thresholds.
+  # Use null to disable a threshold (default behavior).
+  # If you set a number here, any row with a value above the max will be rejected
+  # (and will cause the run to fail if strict: true).
+  max_float_values:
+    distance_from_home: null
+    distance_from_last_transaction: null
+    ratio_to_median_purchase_price: null
+
+  strict: true
+  drop_duplicates: false
+
+train:
+  # Input is the output of the cleaning stage
+  input_csv: data/processed/credit_card_clean.csv
+
+  # Schema + columns
+  expected_columns:
+    - distance_from_home
+    - distance_from_last_transaction
+    - ratio_to_median_purchase_price
+    - repeat_retailer
+    - used_chip
+    - used_pin_number
+    - online_order
+    - fraud
+
+  feature_columns:
+    - distance_from_home
+    - distance_from_last_transaction
+    - ratio_to_median_purchase_price
+    - repeat_retailer
+    - used_chip
+    - used_pin_number
+    - online_order
+
+  target_column: fraud
+
+  # Train/test split settings
+  test_size: 0.2
+  random_state: 42
+
+  # Probability -> label threshold (only used for metrics like precision/recall/F1)
+  decision_threshold: 0.5
+
+  # Optional dev setting to speed up iteration; set to null to use all rows
+  max_rows: null
+
+  # Train three required model variants.
+  # Each model has its own output files so you can compare metrics.
+  models:
+    lr:
+      enabled: true
+      type: logistic_regression
+      model_out: modelinfo/modelpkl/fraud_model_lr.joblib
+      metrics_out: data/processed/train_metrics_lr.json
+      use_standard_scaler: true
+      params:
+        # Passed into sklearn.linear_model.LogisticRegression
+        # penalty: set to null to use sklearn default (typically l2).
+        penalty: null
+        C: 1.0
+        solver: lbfgs
+        max_iter: 200
+        class_weight: balanced
+        random_state: 42
+
+    rf:
+      enabled: true
+      type: random_forest
+      model_out: modelinfo/modelpkl/fraud_model_rf.joblib
+      metrics_out: data/processed/train_metrics_rf.json
+      use_standard_scaler: false
+      params:
+        # Passed into sklearn.ensemble.RandomForestClassifier
+        n_estimators: 300
+        max_depth: null
+        min_samples_split: 2
+        min_samples_leaf: 1
+        max_features: sqrt
+        class_weight: balanced
+        n_jobs: -1
+        random_state: 42
+
+    dt:
+      enabled: true
+      type: decision_tree
+      model_out: modelinfo/modelpkl/fraud_model_dt.joblib
+      metrics_out: data/processed/train_metrics_dt.json
+      use_standard_scaler: false
+      params:
+        # Passed into sklearn.tree.DecisionTreeClassifier
+        max_depth: null
+        min_samples_split: 2
+        min_samples_leaf: 1
+        class_weight: balanced
+        random_state: 42
