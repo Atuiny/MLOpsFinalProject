@@ -102,6 +102,7 @@ function Find-FirstFile([string]$root, [string]$fileName, [string]$preferPathCon
 
 function Download-Artifact([string]$runId, [string]$artifactName, [string]$destDir) {
   Write-Host "Downloading artifact '$artifactName' from run $runId..." -ForegroundColor Cyan
+  Ensure-Directory $destDir
   $null = gh run download $runId --repo $Repo --name $artifactName -D $destDir
 }
 
@@ -124,10 +125,10 @@ $artifactDir = Join-Path $PSScriptRoot "ci_artifacts"
 if (Test-Path $artifactDir) { Remove-Item -Recurse -Force $artifactDir }
 New-Item -ItemType Directory -Path $artifactDir | Out-Null
 
-Download-Artifact -runId $RunId -artifactName $ChampionModelArtifactName -destDir $artifactDir
-Download-Artifact -runId $RunId -artifactName $ChampionRegistryArtifactName -destDir $artifactDir
-Download-Artifact -runId $RunId -artifactName $TrainMetricsArtifactName -destDir $artifactDir
-Download-Artifact -runId $RunId -artifactName $TarArtifactName -destDir $artifactDir
+Download-Artifact -runId $RunId -artifactName $ChampionModelArtifactName -destDir (Join-Path $artifactDir $ChampionModelArtifactName)
+Download-Artifact -runId $RunId -artifactName $ChampionRegistryArtifactName -destDir (Join-Path $artifactDir $ChampionRegistryArtifactName)
+Download-Artifact -runId $RunId -artifactName $TrainMetricsArtifactName -destDir (Join-Path $artifactDir $TrainMetricsArtifactName)
+Download-Artifact -runId $RunId -artifactName $TarArtifactName -destDir (Join-Path $artifactDir $TarArtifactName)
 
 # Sync files into repo for inspection.
 $repoMetricsDir = Join-Path $PSScriptRoot "data\processed"
@@ -139,18 +140,32 @@ Get-ChildItem -Path $artifactDir -Filter "train_metrics_*.json" -Recurse | ForEa
 $championDir = Join-Path $PSScriptRoot "modelinfo\modelregistry\champion"
 Ensure-Directory $championDir
 
-$dlChampionModel = Find-FirstFile -root $artifactDir -fileName "model.joblib" -preferPathContains "modelinfo\modelregistry\champion"
-$dlChampionMetrics = Find-FirstFile -root $artifactDir -fileName "metrics.json" -preferPathContains "modelinfo\modelregistry\champion"
-$dlChampionMetadata = Find-FirstFile -root $artifactDir -fileName "metadata.json" -preferPathContains "modelinfo\modelregistry\champion"
+# Prefer copying the exact champion folder layout from the champion-registry artifact.
+$registryArtifactRoot = Join-Path $artifactDir $ChampionRegistryArtifactName
+$registryChampionPath = Join-Path $registryArtifactRoot "modelinfo\modelregistry\champion"
+if (Test-Path $registryChampionPath) {
+  Write-Host "Syncing champion registry files into: $championDir" -ForegroundColor Cyan
+  Copy-Item -Force -Recurse (Join-Path $registryChampionPath "*") $championDir
 
-if ($dlChampionModel) {
-  Copy-Item -Force $dlChampionModel.FullName (Join-Path $championDir "model.joblib")
-  Copy-Item -Force (Join-Path $championDir "model.joblib") (Join-Path $PSScriptRoot "model.joblib")
+  $championModelPath = Join-Path $championDir "model.joblib"
+  if (Test-Path $championModelPath) {
+    Copy-Item -Force $championModelPath (Join-Path $PSScriptRoot "model.joblib")
+  }
 } else {
-  Write-Host "Warning: champion model.joblib not found in downloaded artifacts." -ForegroundColor Yellow
+  # Fallback: attempt to locate champion files anywhere under the downloaded artifacts.
+  $dlChampionModel = Find-FirstFile -root $artifactDir -fileName "model.joblib" -preferPathContains "modelinfo\modelregistry\champion"
+  $dlChampionMetrics = Find-FirstFile -root $artifactDir -fileName "metrics.json" -preferPathContains "modelinfo\modelregistry\champion"
+  $dlChampionMetadata = Find-FirstFile -root $artifactDir -fileName "metadata.json" -preferPathContains "modelinfo\modelregistry\champion"
+
+  if ($dlChampionModel) {
+    Copy-Item -Force $dlChampionModel.FullName (Join-Path $championDir "model.joblib")
+    Copy-Item -Force (Join-Path $championDir "model.joblib") (Join-Path $PSScriptRoot "model.joblib")
+  } else {
+    Write-Host "Warning: champion model.joblib not found in downloaded artifacts." -ForegroundColor Yellow
+  }
+  if ($dlChampionMetrics) { Copy-Item -Force $dlChampionMetrics.FullName (Join-Path $championDir "metrics.json") }
+  if ($dlChampionMetadata) { Copy-Item -Force $dlChampionMetadata.FullName (Join-Path $championDir "metadata.json") }
 }
-if ($dlChampionMetrics) { Copy-Item -Force $dlChampionMetrics.FullName (Join-Path $championDir "metrics.json") }
-if ($dlChampionMetadata) { Copy-Item -Force $dlChampionMetadata.FullName (Join-Path $championDir "metadata.json") }
 
 # Find tar and copy to repo root for convenience.
 $tar = Get-ChildItem -Path $artifactDir -Filter "*.tar" -Recurse | Select-Object -First 1
@@ -190,6 +205,7 @@ if (-not (Test-Path $ServiceFile)) { throw "Service file not found: $ServiceFile
 
 Write-Host "Applying Kubernetes manifests..." -ForegroundColor Cyan
 kubectl apply -n $Namespace -f $DeploymentFile
+kubectl delete -n $Namespace -f $ServiceFile --ignore-not-found
 kubectl apply -n $Namespace -f $ServiceFile
 
 Write-Host "Waiting for rollout..." -ForegroundColor Cyan
