@@ -40,13 +40,12 @@ Quick start (fresh download from GitHub)
 	What `dvc repro` does:
 	- Runs cleaning (creates processed dataset)
 	- Trains models (LR/RF/DT) and writes metrics
-	- Promotes the best model to "champion" and copies it to repo root for Docker
+	- Promotes the best model to "champion" in the local registry
 
 	Outputs you should see after this:
 	- `data/processed/credit_card_clean.csv`
 	- `data/processed/train_metrics_lr.json` (and rf/dt)
 	- `modelinfo/modelregistry/champion/model.joblib`
-	- `model.joblib` (a copy of the champion for Docker)
 
 4) Run the app locally (includes frontend)
 
@@ -84,36 +83,43 @@ This project includes Kubernetes manifests:
 
 The manifests expect a local image named `fraud-api:latest`.
 
-1) Start Minikube
+Recommended scripts (split into setup vs deploy):
+- `KubeSetUp.ps1` — downloads CI artifacts + loads the Docker image into Minikube (no deploy)
+- `KubeDeploy.ps1` — applies Kubernetes manifests and shows how to access the service
 
-	`minikube start`
+Option A: Use the CI-built Docker image (no build, no retrain)
 
-2) Make sure `model.joblib` exists BEFORE building the image
+1) Setup (downloads artifacts + loads image into Minikube)
+
+	`gh auth login`
+	`./KubeSetUp.ps1`
+
+2) Deploy
+
+	`./KubeDeploy.ps1`
+
+Option B: Build locally inside Minikube
+
+1) Ensure the champion model exists in the registry
 
 	`dvc repro`
 
-3) Build the Docker image *inside* Minikube so Kubernetes can run it
+2) Deploy (and build into Minikube)
 
-	PowerShell:
-	`minikube -p minikube docker-env | Invoke-Expression`
-	`docker build -t fraud-api:latest .`
+	`./KubeDeploy.ps1 -BuildImage`
 
-4) Apply Kubernetes manifests
+Access (Windows + Minikube Docker driver)
 
-	`kubectl apply -f deployment.yaml`
-	`kubectl apply -f service.yaml`
+The most reliable method is port-forward (keep it running):
+	`kubectl port-forward svc/fraud-api-service 8000:8000`
 
-5) Verify and access
+Then open:
+- `http://127.0.0.1:8000/` (frontend)
+- `http://127.0.0.1:8000/health`
 
-	`kubectl get pods`
-	`kubectl get svc`
-
-	Get the URL:
+You can also use:
 	`minikube service fraud-api-service --url`
-
-	Then open the printed URL in a browser:
-	- `/` (frontend)
-	- `/health`
+But on Windows with the Docker driver, you may need to keep that command running in a terminal.
 
 
 If you want to use the model trained by GitHub Actions
@@ -128,14 +134,9 @@ To use an Actions-trained model on your machine:
 
 1) Go to GitHub → Actions → select the workflow run → download the artifact that contains the model.
 
-2) Place the model file in ONE of these supported locations:
+2) Place the model file here (registry location):
 
-	Option A (recommended for Docker):
-	- Put it at repo root as: `model.joblib`
-
-	Option B (registry location):
-	- Put it at: `modelinfo/modelregistry/champion/model.joblib`
-	- (Optional) also copy it to repo root `model.joblib` for Docker builds.
+	- `modelinfo/modelregistry/champion/model.joblib`
 
 3) (Optional but recommended) Place the champion JSON files (if you downloaded them)
 
@@ -146,7 +147,7 @@ To use an Actions-trained model on your machine:
 3) Run the app or Docker as above.
 
 Notes:
-- The app searches in this order: `MODEL_PATH` env var → `./model.joblib` → `modelinfo/modelregistry/champion/model.joblib`.
+- The app searches in this order: `MODEL_PATH` env var → `modelinfo/modelregistry/champion/model.joblib` → `./model.joblib`.
 - If you set `MODEL_PATH`, point it directly to the `.joblib` file.
 
 
