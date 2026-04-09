@@ -17,3 +17,6 @@ modelinfo/modelregistry/champion/*.json
 
 # Generated experiment artifacts (created by promote script)
 modelinfo/modelregistry/candidates/**
+
+# GitHub Actions downloaded artifacts (StartUp.ps1)
+ci_artifacts/
