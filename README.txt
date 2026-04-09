@@ -71,6 +71,47 @@ Docker builds expect `model.joblib` to exist at the repo root. The easiest path 
 Then open `http://127.0.0.1:8000/`.
 
 
+Kubernetes (Minikube)
+---------------------
+
+This project includes Kubernetes manifests:
+- [deployment.yaml](deployment.yaml) (Deployment)
+- [service.yaml](service.yaml) (NodePort Service)
+
+The manifests expect a local image named `fraud-api:latest`.
+
+1) Start Minikube
+
+	`minikube start`
+
+2) Make sure `model.joblib` exists BEFORE building the image
+
+	`dvc repro`
+
+3) Build the Docker image *inside* Minikube so Kubernetes can run it
+
+	PowerShell:
+	`minikube -p minikube docker-env | Invoke-Expression`
+	`docker build -t fraud-api:latest .`
+
+4) Apply Kubernetes manifests
+
+	`kubectl apply -f deployment.yaml`
+	`kubectl apply -f service.yaml`
+
+5) Verify and access
+
+	`kubectl get pods`
+	`kubectl get svc`
+
+	Get the URL:
+	`minikube service fraud-api-service --url`
+
+	Then open the printed URL in a browser:
+	- `/` (frontend)
+	- `/health`
+
+
 If you want to use the model trained by GitHub Actions
 ------------------------------------------------------
 
