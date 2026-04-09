@@ -20,3 +20,6 @@ modelinfo/modelregistry/candidates/**
 
 # GitHub Actions downloaded artifacts (StartUp.ps1)
 ci_artifacts/
+
+# Local convenience copy of the CI docker image tar
+fraud-inference-api.tar
