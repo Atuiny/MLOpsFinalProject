@@ -10,9 +10,11 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 # Copy the API code
 COPY app.py /app/app.py
 
-# Copy the promoted champion model artifact.
-# The GitHub Actions pipeline is responsible for generating this file.
-COPY model.joblib /app/model.joblib
+# Copy the promoted champion model artifact from the registry location.
+COPY modelinfo/modelregistry/champion/model.joblib /app/modelinfo/modelregistry/champion/model.joblib
+
+# Ensure the service loads the registry champion by default.
+ENV MODEL_PATH=/app/modelinfo/modelregistry/champion/model.joblib
 
 EXPOSE 8000
 

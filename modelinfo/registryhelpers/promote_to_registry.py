@@ -227,13 +227,8 @@ def main() -> None:
     }
     _write_json(champion_meta_path, promote_meta)
 
-    # Docker compatibility: copy champion model to repo root.
-    root_copy = REPO_ROOT / "model.joblib"
-    _copy_file(champion_model_path, root_copy)
-
     print("Promoted to champion")
     print(f"- champion_model: {champion_model_path}")
-    print(f"- root_model_copy: {root_copy}")
 
 
 if __name__ == "__main__":

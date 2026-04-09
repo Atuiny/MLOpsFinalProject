@@ -41,4 +41,3 @@ stages:
       - modelinfo/modelregistry/champion/model.joblib
       - modelinfo/modelregistry/champion/metrics.json
       - modelinfo/modelregistry/champion/metadata.json
-      - model.joblib

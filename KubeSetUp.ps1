@@ -145,12 +145,12 @@ $registryArtifactRoot = Join-Path $artifactDir $ChampionRegistryArtifactName
 $registryChampionPath = Join-Path $registryArtifactRoot "modelinfo\modelregistry\champion"
 if (Test-Path $registryChampionPath) {
   Write-Host "Syncing champion registry files into: $championDir" -ForegroundColor Cyan
+  # Remove any pre-existing champion files so we don't keep stale leftovers.
+  Get-ChildItem -Path $championDir -Force -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
   Copy-Item -Force -Recurse (Join-Path $registryChampionPath "*") $championDir
 
   $championModelPath = Join-Path $championDir "model.joblib"
-  if (Test-Path $championModelPath) {
-    Copy-Item -Force $championModelPath (Join-Path $PSScriptRoot "model.joblib")
-  }
+  # Intentionally do NOT copy to repo root. The champion folder is the source of truth.
 } else {
   # Fallback: attempt to locate champion files anywhere under the downloaded artifacts.
   $dlChampionModel = Find-FirstFile -root $artifactDir -fileName "model.joblib" -preferPathContains "modelinfo\modelregistry\champion"
@@ -159,7 +159,6 @@ if (Test-Path $registryChampionPath) {
 
   if ($dlChampionModel) {
     Copy-Item -Force $dlChampionModel.FullName (Join-Path $championDir "model.joblib")
-    Copy-Item -Force (Join-Path $championDir "model.joblib") (Join-Path $PSScriptRoot "model.joblib")
   } else {
     Write-Host "Warning: champion model.joblib not found in downloaded artifacts." -ForegroundColor Yellow
   }

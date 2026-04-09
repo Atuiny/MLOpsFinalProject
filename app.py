@@ -71,11 +71,11 @@ def _candidate_model_paths() -> list[Path]:
 	if env:
 		paths.append(Path(env))
 
-	# Docker-friendly path.
-	paths.append(Path("model.joblib"))
-
-	# Local registry default.
+	# Registry "source of truth".
 	paths.append(Path("modelinfo/modelregistry/champion/model.joblib"))
+
+	# Fallback for older images/flows that place a copy at repo root.
+	paths.append(Path("model.joblib"))
 	return paths
 
 

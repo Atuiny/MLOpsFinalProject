@@ -250,7 +250,6 @@ if ($DownloadFromGitHub) {
   if ($downloadedChampionModel) {
     Write-Host "Syncing champion model into repo..." -ForegroundColor Cyan
     Copy-Item -Force $downloadedChampionModel.FullName (Join-Path $localChampionDir "model.joblib")
-    Copy-Item -Force (Join-Path $localChampionDir "model.joblib") (Join-Path $PSScriptRoot "model.joblib")
   } else {
     Write-Host "Warning: champion model.joblib not found in downloaded artifacts." -ForegroundColor Yellow
   }

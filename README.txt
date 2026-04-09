@@ -60,9 +60,13 @@ Quick start (fresh download from GitHub)
 Using Docker (after the model exists)
 -----------------------------------
 
-Docker builds expect `model.joblib` to exist at the repo root. The easiest path is:
+Docker builds expect the promoted champion to exist at:
 
-1) Run `dvc repro` (see above). This creates `model.joblib`.
+	`modelinfo/modelregistry/champion/model.joblib`
+
+The easiest path is:
+
+1) Run `dvc repro` (see above). This creates the champion registry files.
 2) Build + run:
 
 	`docker build -t fraud-inference-api:latest .`
