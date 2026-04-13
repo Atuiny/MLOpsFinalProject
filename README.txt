@@ -17,6 +17,60 @@ Project layout (important files)
 - `Dockerfile` — container for FastAPI inference
 
 
+Dataset tracking note (why the raw CSV is in Git)
+------------------------------------------------
+
+This project uses DVC to make the *pipeline* reproducible (`dvc.yaml` + `dvc repro`).
+In a production MLOps setup, the dataset would typically be tracked via DVC with a
+configured remote (S3/Azure/GCS/etc.) so Git stays small and data versions are managed
+outside the repo.
+
+For this class, the fully-correct DVC-remote setup is out of scope and the dataset is
+expected to be accessible directly from GitHub, so `data/raw/credit_card_data.csv` is
+committed to git on purpose.
+
+If you want to switch to “proper” DVC data versioning later, the high-level steps are:
+- `dvc add data/raw/credit_card_data.csv`
+- configure a DVC remote (ex: `dvc remote add -d <name> <url>`)
+- `dvc push`
+- commit the generated `.dvc` file(s) to git (not the raw CSV)
+
+
+MLflow note (simulated via CI + file-based registry)
+---------------------------------------------------
+
+This project intentionally does *not* use the `mlflow` library.
+Per class guidance, “MLflow-style” experiment tracking and the model registry are
+simulated using:
+
+- GitHub Actions: training runs produce metrics/metadata and publish them as workflow artifacts
+- A local, file-based registry in `modelinfo/modelregistry/` with:
+  - `candidates/<run-id>/` (each run has `metrics.json`, `metadata.json`, `model.joblib`)
+  - `champion/` (the currently promoted best model)
+
+The script `modelinfo/registryhelpers/promote_to_registry.py` selects the best candidate
+based on the recorded metrics and promotes it to `champion/`.
+
+
+How to Start (minimal path)
+--------------------------
+
+1) Install + run locally
+
+	`git clone https://github.com/Atuiny/MLOpsFinalProject.git`
+	`cd MLOpsFinalProject`
+	`python -m venv .venv`
+	`./.venv/Scripts/Activate.ps1`
+	`pip install -r requirements.txt`
+	`dvc repro`
+	`python -m uvicorn app:app --host 127.0.0.1 --port 8000`
+
+2) Open the app
+
+	- `http://127.0.0.1:8000/` (frontend)
+	- `http://127.0.0.1:8000/docs` (API docs)
+
+
 Quick start (fresh download from GitHub)
 --------------------------------------
 
@@ -120,6 +174,44 @@ Then open:
 You can also use:
 	`minikube service fraud-api-service --url`
 But on Windows with the Docker driver, you may need to keep that command running in a terminal.
+
+
+Monitoring (Prometheus + Grafana)
+-------------------------------
+
+The API exposes Prometheus metrics at:
+- `http://<service>:8000/metrics` (local: `http://127.0.0.1:8000/metrics`)
+
+Minimal Kubernetes setup (teacher-style Helm charts):
+
+1) Install Prometheus + Grafana
+
+	`helm repo add prometheus-community https://prometheus-community.github.io/helm-charts`
+	`helm repo add grafana https://grafana.github.io/helm-charts`
+	`helm repo update`
+	`helm install prometheus prometheus-community/prometheus`
+	`helm install grafana grafana/grafana`
+
+2) Configure Prometheus to scrape the API Service
+
+This repo includes a prepared Prometheus ConfigMap export at `prometheus.yaml`.
+Apply it and restart Prometheus:
+
+	`kubectl apply -f prometheus.yaml`
+	`kubectl rollout restart deploy/prometheus-server`
+
+3) Open Prometheus + Grafana (port-forward)
+
+	`kubectl port-forward svc/prometheus-server 9090:80`
+	`kubectl port-forward svc/grafana 3000:80`
+
+4) In Grafana, add Prometheus datasource
+
+- URL: `http://prometheus-server`
+
+Example PromQL to verify data:
+- `sum(rate(http_requests_total[1m]))`
+- `sum(rate(predict_requests_total[1m]))`
 
 
 If you want to use the model trained by GitHub Actions
