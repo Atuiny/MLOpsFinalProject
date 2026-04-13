@@ -7,11 +7,10 @@
 
   It:
     1) Starts Minikube (if needed)
-    2) (Optional) Runs `dvc repro` to ensure `model.joblib` exists
-    3) Builds the Docker image *inside Minikube* (so the cluster can run it)
-    4) Applies `deployment.yaml` and `service.yaml`
-    5) Waits for the Deployment rollout
-    6) Prints the Service URL (NodePort) for access
+    2) (Optional) Builds the Docker image *inside Minikube* (so the cluster can run it)
+    3) Applies `deployment.yaml` and `service.yaml`
+    4) Waits for the Deployment rollout
+    5) Prints a reliable way to access the service
 
   Requirements:
     - minikube
@@ -37,10 +36,11 @@
 
 .PARAMETER RunDvcRepro
   If set, runs `dvc repro` before building the image.
-  Use this if you need to regenerate `model.joblib`.
+  Use this if you need to (re)create the champion model in the registry.
 
-.PARAMETER SkipBuild
-  If set, skips docker build (assumes image is already present in Minikube).
+.PARAMETER BuildImage
+  If set, builds the image inside Minikube before deploying.
+  If not set, assumes the image is already available in Minikube (e.g. via KubeSetUp.ps1).
 
 .EXAMPLE
   # Most common: build inside minikube and deploy
@@ -62,7 +62,11 @@ param(
   [string]$ServiceFile = "./service.yaml",
   [string]$ServiceName = "fraud-api-service",
   [switch]$RunDvcRepro,
-  [switch]$SkipBuild
+  [switch]$BuildImage,
+
+  # On Windows + Docker driver, `minikube service --url` may keep a proxy running
+  # and never exit. Keep it opt-in so this script finishes reliably.
+  [switch]$PrintServiceUrl
 )
 
 $ErrorActionPreference = "Stop"
@@ -106,13 +110,14 @@ if ($RunDvcRepro) {
   if ($LASTEXITCODE -ne 0) { throw "dvc repro failed" }
 }
 
-if (-not (Test-Path (Join-Path $PSScriptRoot "model.joblib"))) {
-  Write-Host "Warning: model.joblib not found at repo root." -ForegroundColor Yellow
-  Write-Host "Docker/Kubernetes image build will fail if your Dockerfile expects it." -ForegroundColor Yellow
-  Write-Host "If needed, run: dvc repro (or re-run this script with -RunDvcRepro)" -ForegroundColor Yellow
+$championModel = Join-Path $PSScriptRoot "modelinfo\modelregistry\champion\model.joblib"
+if (-not (Test-Path $championModel)) {
+  Write-Host "Warning: champion model not found at: $championModel" -ForegroundColor Yellow
+  Write-Host "If you need to generate it locally, run: dvc repro" -ForegroundColor Yellow
+  Write-Host "If you want the CI-trained model, run: .\\KubeSetUp.ps1" -ForegroundColor Yellow
 }
 
-if (-not $SkipBuild) {
+if ($BuildImage) {
   Require-Command docker
 
   Write-Host "Configuring shell to use Minikube Docker daemon..." -ForegroundColor Cyan
@@ -123,7 +128,8 @@ if (-not $SkipBuild) {
   docker build -t $Image $PSScriptRoot
   if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
 } else {
-  Write-Host "Skipping docker build (-SkipBuild set)." -ForegroundColor Yellow
+  Write-Host "Skipping docker build (default)." -ForegroundColor Yellow
+  Write-Host "If the image isn't available in Minikube yet, run .\\KubeSetUp.ps1 or re-run with -BuildImage." -ForegroundColor Yellow
 }
 
 if (-not (Test-Path $DeploymentFile)) { throw "Deployment file not found: $DeploymentFile" }
@@ -146,7 +152,28 @@ try {
 }
 
 Write-Host "\nService URL:" -ForegroundColor Green
-minikube service -n $Namespace $ServiceName --url
+if ($PrintServiceUrl) {
+  try {
+    $url = (minikube service -n $Namespace $ServiceName --url --wait=1) | Select-Object -First 1
+    if ($url) {
+      Write-Host $url -ForegroundColor Green
+      Write-Host "Note: on Windows with the Docker driver, this URL may only work while 'minikube service' is running." -ForegroundColor Yellow
+      Write-Host "If you get ERR_CONNECTION_REFUSED, run this in a separate terminal and keep it open:" -ForegroundColor Yellow
+      Write-Host "  minikube service -n $Namespace $ServiceName" -ForegroundColor Yellow
+    } else {
+      Write-Host "(No URL returned.)" -ForegroundColor Yellow
+    }
+  } catch {
+    Write-Host "Could not fetch minikube service URL." -ForegroundColor Yellow
+  }
+} else {
+  Write-Host "(Skipped. To print a URL, run: minikube service -n $Namespace $ServiceName --url)" -ForegroundColor Yellow
+  Write-Host "Tip: run this script with -PrintServiceUrl to try once (non-blocking)." -ForegroundColor Yellow
+}
+
+Write-Host "\nReliable access (recommended):" -ForegroundColor Green
+Write-Host "  kubectl port-forward -n $Namespace svc/$ServiceName 8000:8000" -ForegroundColor Green
+Write-Host "  Then open: http://127.0.0.1:8000/" -ForegroundColor Green
 
 Write-Host "\nTry endpoints:" -ForegroundColor Green
 Write-Host "- /        (frontend)" -ForegroundColor Green

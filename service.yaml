@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: fraud-api-service
+  labels:
+    app: fraud-api
 spec:
   type: NodePort
   selector:

@@ -20,13 +20,16 @@ the Docker image can include it.
 
 import os
 from pathlib import Path
+import time
 from typing import Any, Optional
 
 import joblib
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
+from starlette.responses import Response
 
 
 FEATURE_NAMES = [
@@ -60,6 +63,29 @@ class PredictResponse(BaseModel):
 
 
 app = FastAPI(title="Fraud Probability API")
+
+HTTP_REQUESTS_TOTAL = Counter(
+	"http_requests_total",
+	"Total HTTP requests",
+	["method", "path", "status"],
+)
+HTTP_REQUEST_DURATION_SECONDS = Histogram(
+	"http_request_duration_seconds",
+	"HTTP request duration in seconds",
+	["method", "path"],
+)
+
+# Some docs/classes use this simpler example name; Prometheus will expose it as
+# request_count_total.
+REQUEST_COUNT = Counter(
+	"request_count",
+	"Total number of requests",
+)
+
+PREDICT_REQUESTS_TOTAL = Counter(
+	"predict_requests_total",
+	"Total /predict requests",
+)
 
 _artifact: Optional[dict[str, Any]] = None
 
@@ -98,9 +124,30 @@ def _startup() -> None:
 	_artifact = _load_artifact()
 
 
+@app.middleware("http")
+async def _prometheus_http_middleware(request: Request, call_next):
+	start = time.perf_counter()
+	response = await call_next(request)
+	duration = time.perf_counter() - start
+
+	path = request.url.path
+	method = request.method
+	status = str(response.status_code)
+
+	HTTP_REQUESTS_TOTAL.labels(method=method, path=path, status=status).inc()
+	HTTP_REQUEST_DURATION_SECONDS.labels(method=method, path=path).observe(duration)
+	REQUEST_COUNT.inc()
+	return response
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
 	return {"status": "ok"}
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+	return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -233,6 +280,7 @@ def index() -> str:
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest) -> PredictResponse:
+	PREDICT_REQUESTS_TOTAL.inc()
 	if _artifact is None:
 		raise HTTPException(status_code=500, detail="Model not loaded")
 	if req.features is None:

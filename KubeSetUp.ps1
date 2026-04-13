@@ -22,7 +22,6 @@
     - gh (GitHub CLI) and authenticated (gh auth login)
     - docker
     - minikube
-    - kubectl
 
 .PARAMETER Repo
   GitHub repo (owner/repo).
@@ -109,7 +108,6 @@ function Download-Artifact([string]$runId, [string]$artifactName, [string]$destD
 Require-Command gh
 Require-Command docker
 Require-Command minikube
-Require-Command kubectl
 
 Write-Host "Checking GitHub CLI auth..." -ForegroundColor Cyan
 try { gh auth status | Out-Null } catch { throw "Not logged into GitHub CLI. Run: gh auth login" }
@@ -199,27 +197,6 @@ minikube start | Out-Null
 Write-Host "Loading image into Minikube: $K8sImage" -ForegroundColor Cyan
 minikube image load $K8sImage
 
-if (-not (Test-Path $DeploymentFile)) { throw "Deployment file not found: $DeploymentFile" }
-if (-not (Test-Path $ServiceFile)) { throw "Service file not found: $ServiceFile" }
-
-Write-Host "Applying Kubernetes manifests..." -ForegroundColor Cyan
-kubectl apply -n $Namespace -f $DeploymentFile
-kubectl delete -n $Namespace -f $ServiceFile --ignore-not-found
-kubectl apply -n $Namespace -f $ServiceFile
-
-Write-Host "Waiting for rollout..." -ForegroundColor Cyan
-try {
-  $deployName = (kubectl get -n $Namespace -f $DeploymentFile -o jsonpath='{.items[0].metadata.name}')
-  if ($deployName) {
-    kubectl rollout status -n $Namespace deployment/$deployName --timeout=180s
-  }
-} catch {
-  Write-Host "Could not auto-detect deployment name. Check with: kubectl get deployments" -ForegroundColor Yellow
-}
-
-Write-Host "\nService URL:" -ForegroundColor Green
-minikube service -n $Namespace $ServiceName --url
-
-Write-Host "\nTry endpoints:" -ForegroundColor Green
-Write-Host "- /        (frontend)" -ForegroundColor Green
-Write-Host "- /health  (health check)" -ForegroundColor Green
+Write-Host "\nSetup complete." -ForegroundColor Green
+Write-Host "Next: deploy to Kubernetes with:" -ForegroundColor Green
+Write-Host "  .\\KubeDeploy.ps1" -ForegroundColor Green

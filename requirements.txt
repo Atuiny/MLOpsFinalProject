@@ -8,3 +8,5 @@ dvc
 fastapi
 uvicorn[standard]
 pydantic
+
+prometheus-client
