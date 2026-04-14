@@ -141,6 +141,9 @@ Recommended scripts (split into setup vs deploy):
 - `KubeSetUp.ps1` — downloads CI artifacts + loads the Docker image into Minikube (no deploy)
 - `KubeDeploy.ps1` — applies Kubernetes manifests and shows how to access the service
 
+Optional local Docker helper:
+- `StartUp.ps1` — runs the API locally using a CI-built image tar (or local build)
+
 Option A: Use the CI-built Docker image (no build, no retrain)
 
 1) Setup (downloads artifacts + loads image into Minikube)

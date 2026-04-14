@@ -18,7 +18,7 @@
      - Then it performs the same docker load/run steps.
 
   3) Local build mode (optional)
-     - Runs `dvc repro` to generate `model.joblib` (unless -SkipDvcRepro)
+      - Runs `dvc repro` to generate the promoted champion model (unless -SkipDvcRepro)
      - Builds a local Docker image from this repo
      - Runs the container on http://127.0.0.1:<HostPort>
 
@@ -288,8 +288,9 @@ if ($LocalBuild) {
     }
   }
 
-  if (-not (Test-Path (Join-Path $PSScriptRoot "model.joblib"))) {
-    throw "model.joblib not found at repo root. Run 'dvc repro' first or provide a model.joblib."
+  $championModel = Join-Path $PSScriptRoot "modelinfo\modelregistry\champion\model.joblib"
+  if (-not (Test-Path $championModel)) {
+    throw "Champion model not found at: $championModel. Run 'dvc repro' first (or use -DownloadFromGitHub)."
   }
 
   Write-Host "Building Docker image: $LocalImage" -ForegroundColor Cyan
